@@ -13,4 +13,10 @@ FINAL_ISO_PATH="${BINARIES_DIR}/shredos-${SUFFIXISO}.iso"
 
 mv "${BINARIES_DIR}/rootfs.iso9660" "${FINAL_ISO_PATH}"
 
-echo "ISO image '${FINAL_ISO_PATH}' (for '${MKIMAGE_ARCH}' architecture) created successfully!"
+echo "==============================================="
+echo "  ISO image '${FINAL_ISO_PATH}'"
+echo "  (for '${MKIMAGE_ARCH}' architecture)"
+echo "  CREATED SUCCESSFULLY!"
+echo "==============================================="
+
+exit 0
