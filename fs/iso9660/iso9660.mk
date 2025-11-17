@@ -192,6 +192,10 @@ define ROOTFS_ISO9660_INSTALL_ISOLINUX_BIOS
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/ldlinux.c32
 	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/menu.c32 \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/menu.c32
+	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/libutil.c32 \
+		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/libutil.c32
+	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/libcom32.c32 \
+		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/libcom32.c32
 endef
 
 define ROOTFS_ISO9660_INSTALL_ISOLINUX_CONFIG
@@ -227,6 +231,10 @@ define ROOTFS_ISO9660_INSTALL_ISOLINUX_BIOS
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/ldlinux.c32
 	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/menu.c32 \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/menu.c32
+	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/libutil.c32 \
+		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/libutil.c32
+	$(INSTALL) -D -m 0644 $(HOST_DIR)/share/syslinux/libcom32.c32 \
+		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/isolinux/libcom32.c32
 endef
 
 define ROOTFS_ISO9660_INSTALL_ISOLINUX_CONFIG
