@@ -131,6 +131,9 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_BOOT_MENU
 	  ISO9660 filesystem containing the actual GRUB2 configuration file.
 	  Alternatively, 'set root=(cd0)' could be directly set here also...
 
+	  Note that the string __EFI_ID_FILE__ will automatically be
+	  replaced with the BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE.
+
 	  Do not mistake this for the regular GRUB2 configuration that is
 	  eventually loaded by the EFI bootloader, this is just for systems
 	  which need some extra help to locate the actual ISO9660 filesystem.
