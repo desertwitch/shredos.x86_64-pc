@@ -94,8 +94,8 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_BOOT_MENU
 	  will automatically be replaced by the path to the kernel and
 	  initrd images respectively.
 
-config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_ID_FILE
-	string "Grub2 EFI identification file"
+config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE
+	string "Grub2 identification file"
 	depends on (BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH) \
 		&& BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
 	default ".buildroot"
@@ -104,8 +104,17 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_ID_FILE
 	  file that is added to the ISO9660 filesystem, so the EFI bootloader
 	  can better "search" it among possibly multiple attached boot mediums.
 
+config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_PARTITION_SIZE
+	string "Grub2 EFI partition size"
+	depends on (BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH) \
+		&& BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
+	default "3M"
+	help
+	  Use this option to increase the size of the EFI partition.
+	  Embedding more GRUB2 modules may require a larger EFI partition size.
+
 config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_BOOT_MENU
-	string "Grub2 EFI partition config file"
+	string "Grub2 EFI embedded config file"
 	depends on (BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH) \
 		&& BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
 	default "fs/iso9660/efigrub.cfg"
@@ -115,6 +124,10 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_BOOT_MENU
 
 	  It will usually just contain a "search" directive to find the
 	  ISO9660 filesystem containing the actual GRUB2 configuration file.
+
+	  Do not mistake this for the regular GRUB2 configuration that is
+	  eventually loaded by the EFI bootloader, this is just for systems
+	  which need some extra help to locate the actual ISO9660 filesystem.
 
 config BR2_TARGET_ROOTFS_ISO9660_INITRD
 	bool "Use initrd"
