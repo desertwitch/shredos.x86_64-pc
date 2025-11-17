@@ -35,6 +35,10 @@ ROOTFS_ISO9660_GRUB2_EFI_PARTITION_SIZE = $(call qstrip,$(BR2_TARGET_ROOTFS_ISO9
 ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE = $(call qstrip,$(BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE))
 ROOTFS_ISO9660_ISOLINUX_BOOT_MENU = $(call qstrip,$(BR2_TARGET_ROOTFS_ISO9660_ISOLINUX_BOOT_MENU))
 
+################################################################################
+# Architecture-specific variables
+################################################################################
+
 ifeq ($(BR2_ARCH_IS_64),y)
 ROOTFS_ISO9660_EFI_NAME = bootx64.efi
 ROOTFS_ISO9660_EFI_NOTNAME = bootia32.efi
@@ -327,7 +331,7 @@ define ROOTFS_ISO9660_DISABLE_EXTERNAL_INITRD
 	$(if $(ROOTFS_ISO9660_GRUB2_EFI_CONFIG_PATH), \
 		$(SED) '/__INITRD_PATH__/d' $(ROOTFS_ISO9660_GRUB2_EFI_CONFIG_PATH))
 	$(if $(ROOTFS_ISO9660_ISOLINUX_CONFIG_PATH), \
-		$(SED) '/append[[:space:]]*initrd=__INITRD_PATH__[[:space:]]*$$/d' $(ROOTFS_ISO9660_ISOLINUX_CONFIG_PATH); \
+		$(SED) '/append[[:space:]]*initrd=__INITRD_PATH__[[:space:]]*$$/d' $(ROOTFS_ISO9660_ISOLINUX_CONFIG_PATH) && \
 		$(SED) 's/initrd=__INITRD_PATH__[[:space:]]*//' $(ROOTFS_ISO9660_ISOLINUX_CONFIG_PATH))
 endef
 
