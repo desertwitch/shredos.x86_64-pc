@@ -85,7 +85,7 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_BOOT_MENU
 config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_ID_FILE
 	string "Grub2 EFI identification file"
 	depends on (BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH) \
-		&& (BR2_TARGET_GRUB2_I386_EFI || BR2_TARGET_GRUB2_X86_64_EFI)
+		&& BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
 	default ".buildroot"
 	help
 	  Use this option to provide a custom name for the identification
@@ -95,7 +95,7 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_ID_FILE
 config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_BOOT_MENU
 	string "Grub2 EFI partition config file"
 	depends on (BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH) \
-		&& (BR2_TARGET_GRUB2_I386_EFI || BR2_TARGET_GRUB2_X86_64_EFI)
+		&& BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
 	default "fs/iso9660/efigrub.cfg"
 	help
 	  Use this option to provide a custom GRUB2 configuration
