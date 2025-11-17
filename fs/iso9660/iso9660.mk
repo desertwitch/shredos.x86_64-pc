@@ -370,7 +370,7 @@ ROOTFS_ISO9660_PRE_GEN_HOOKS += ROOTFS_ISO9660_INSTALL_BOOTLOADERS
 # ISO9660 Generation Options
 ################################################################################
 
-ROOTFS_ISO9660_OPTS += -J -r
+ROOTFS_ISO9660_OPTS += -r -J -joliet-long -cache-inodes
 
 ROOTFS_ISO9660_OPTS_BIOS = \
 	-b $(ROOTFS_ISO9660_BOOT_IMAGE) \
