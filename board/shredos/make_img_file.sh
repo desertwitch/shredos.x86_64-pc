@@ -32,10 +32,12 @@ SUFFIXIMG="${version}_$(date +%Y%m%d)"
 FINAL_IMAGE_PATH="${BINARIES_DIR}/shredos-${SUFFIXIMG}.img"
 mv "${BINARIES_DIR}/shredos.img" "${FINAL_IMAGE_PATH}"                                    || exit 1
 
+echo
 echo "==============================================="
 echo "  USB image '${FINAL_IMAGE_PATH}'"
 echo "  (for '${MKIMAGE_ARCH}' architecture)"
 echo "  CREATED SUCCESSFULLY!"
 echo "==============================================="
+echo
 
 exit 0
