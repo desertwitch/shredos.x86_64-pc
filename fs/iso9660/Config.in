@@ -70,6 +70,18 @@ config BR2_TARGET_ROOTFS_ISO9660_BIOS_BOOTLOADER
 config BR2_TARGET_ROOTFS_ISO9660_EFI_BOOTLOADER
 	bool
 
+config BR2_TARGET_ROOTFS_ISO9660_ISOLINUX_BOOT_MENU
+	string "Isolinux boot menu config file"
+	depends on BR2_TARGET_ROOTFS_ISO9660_ISOLINUX || BR2_TARGET_ROOTFS_ISO9660_BOTH
+	default "fs/iso9660/isolinux.cfg"
+	help
+	  Use this option to provide a custom ISOLINUX configuration
+	  file (isolinux.cfg).
+
+	  Note that the strings __KERNEL_PATH__ and __INITRD_PATH__
+	  will automatically be replaced by the path to the kernel and
+	  initrd images respectively.
+
 config BR2_TARGET_ROOTFS_ISO9660_GRUB2_BOOT_MENU
 	string "Grub2 boot menu config file"
 	depends on BR2_TARGET_ROOTFS_ISO9660_GRUB2 || BR2_TARGET_ROOTFS_ISO9660_BOTH
@@ -103,18 +115,6 @@ config BR2_TARGET_ROOTFS_ISO9660_GRUB2_EFI_BOOT_MENU
 
 	  It will usually just contain a "search" directive to find the
 	  ISO9660 filesystem containing the actual GRUB2 configuration file.
-
-config BR2_TARGET_ROOTFS_ISO9660_ISOLINUX_BOOT_MENU
-	string "Isolinux boot menu config file"
-	depends on BR2_TARGET_ROOTFS_ISO9660_ISOLINUX || BR2_TARGET_ROOTFS_ISO9660_BOTH
-	default "fs/iso9660/isolinux.cfg"
-	help
-	  Use this option to provide a custom ISOLINUX configuration
-	  file (isolinux.cfg).
-
-	  Note that the strings __KERNEL_PATH__ and __INITRD_PATH__
-	  will automatically be replaced by the path to the kernel and
-	  initrd images respectively.
 
 config BR2_TARGET_ROOTFS_ISO9660_INITRD
 	bool "Use initrd"
