@@ -372,6 +372,9 @@ ROOTFS_ISO9660_PRE_GEN_HOOKS += ROOTFS_ISO9660_INSTALL_BOOTLOADERS
 
 ################################################################################
 # ISO9660 Generation Options
+#
+# Note: Argument order is crucial here, this command line was inspired by
+# modern Debian distributions (see .disk/mkisofs inside one of their ISOs)
 ################################################################################
 
 ROOTFS_ISO9660_OPTS += -r -V 'ISO9660' -J -joliet-long -cache-inodes
