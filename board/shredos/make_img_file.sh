@@ -1,11 +1,13 @@
 #!/bin/bash -e
 
 if grep -Eq "^BR2_ARCH_IS_64=y$" "${BR2_CONFIG}"; then
-	MKIMAGE_ARCH=x86_64
-	MKIMAGE_EFI=bootx64.efi
+    MKIMAGE_ARCH=x86_64
+    MKIMAGE_EFI=bootx64.efi
+    MKIMAGE_CFG=genimage.cfg
 else
-	MKIMAGE_ARCH=i386
-	MKIMAGE_EFI=bootia32.efi
+    MKIMAGE_ARCH=i586
+    MKIMAGE_EFI=bootia32.efi
+    MKIMAGE_CFG=genimage_i586.cfg
 fi
 
 version=$(cat board/shredos/fsoverlay/etc/shredos/version.txt)
@@ -25,13 +27,17 @@ rm -rf "${BUILD_DIR}/genimage.tmp"                                              
 genimage --rootpath="${TARGET_DIR}" \
     --inputpath="${BINARIES_DIR}" \
     --outputpath="${BINARIES_DIR}" \
-    --config="board/shredos/genimage_${MKIMAGE_ARCH}.cfg" \
+    --config="board/shredos/${MKIMAGE_CFG}" \
     --tmppath="${BUILD_DIR}/genimage.tmp"                                                 || exit 1
 
 SUFFIXIMG="${version}_$(date +%Y%m%d)"
 FINAL_IMAGE_PATH="${BINARIES_DIR}/shredos-${SUFFIXIMG}.img"
 mv "${BINARIES_DIR}/shredos.img" "${FINAL_IMAGE_PATH}"                                    || exit 1
 
+GREEN="\033[0;32m"
+RESET="\033[0m"
+
+printf "%b" "$GREEN"
 echo
 echo "==============================================="
 echo "  USB image '${FINAL_IMAGE_PATH}'"
@@ -39,5 +45,6 @@ echo "  (for '${MKIMAGE_ARCH}' architecture)"
 echo "  CREATED SUCCESSFULLY!"
 echo "==============================================="
 echo
+printf "%b\n" "$RESET"
 
 exit 0
