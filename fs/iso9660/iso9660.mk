@@ -141,7 +141,7 @@ define ROOTFS_ISO9660_INSTALL_GRUB2_EFI
 	# Create identification file to better find ISO9660 filesystem
 	$(INSTALL) -D -m 0644 /dev/null \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/$(ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE)
-	# Copy efigrub.cfg to ISO9660 filesystem also
+	# Copy efigrub.cfg to ISO9660 filesystem for the bootloader to find
 	$(INSTALL) -D -m 0644 $(ROOTFS_ISO9660_GRUB2_EFI_CONFIG_PATH) \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/$(ROOTFS_ISO9660_GRUB2_EFI_PREFIX)/grub.cfg
 	$(INSTALL) -D -m 0644 $(ROOTFS_ISO9660_EFI_PARTITION_CONTENT)/$(ROOTFS_ISO9660_GRUB2_EFI_PREFIX)/$(ROOTFS_ISO9660_EFI_NAME) \
@@ -252,7 +252,7 @@ define ROOTFS_ISO9660_INSTALL_GRUB2_EFI
 	# Create identification file to better find ISO9660 filesystem
 	$(INSTALL) -D -m 0644 /dev/null \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/$(ROOTFS_ISO9660_GRUB2_EFI_IDENT_FILE)
-	# Copy efigrub.cfg to ISO9660 filesystem also
+	# Copy efigrub.cfg to ISO9660 filesystem for the bootloader to find
 	$(INSTALL) -D -m 0644 $(ROOTFS_ISO9660_GRUB2_EFI_CONFIG_PATH) \
 		$(ROOTFS_ISO9660_TMP_TARGET_DIR)/$(ROOTFS_ISO9660_GRUB2_EFI_PREFIX)/grub.cfg
 	$(INSTALL) -D -m 0644 $(ROOTFS_ISO9660_EFI_PARTITION_CONTENT)/$(ROOTFS_ISO9660_GRUB2_EFI_PREFIX)/$(ROOTFS_ISO9660_EFI_NAME) \
