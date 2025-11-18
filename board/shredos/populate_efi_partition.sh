@@ -6,9 +6,9 @@
 # for CD/DVD-ROM burned ISO images, as the EFI partition will be in RAM,
 # but allow any USB burned ISO images to have that accessible data location.
 #
-# Keep in mind that the EFI partition needs to be loaded into RAM when
-# the ISO image is burned to CD/DVD-ROM, so it should not be huge, as this
-# could cause issues on 32-bit UEFI (not that it is very common, but still).
+# Keep in mind that the EFI partition size (in configuration) must be below
+# the maximum of 65535 blocks of 512 bytes (= ~32 MB) or the ISO will not
+# be bootable, but xorriso would warn about this in the ISO creation stage.
 #
 
 mkdir -p "${BINARIES_DIR}/efi-part/boot/"                                                               || exit 1
