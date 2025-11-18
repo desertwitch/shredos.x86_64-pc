@@ -1,5 +1,10 @@
 #!/bin/bash
 
+set -e
+
+trap 'exit 1' SIGINT
+trap 'exit 1' SIGTERM
+
 mkdir -p dist
 
 x64_configs=(
@@ -40,11 +45,13 @@ build_config() {
     echo "Building $config"
     echo "============================================"
 
-    make clean         || exit 1
-    make "$config"     || exit 1
+    make clean
+    make "$config"
 
+	set +e
     make 2>&1 | tee "$log_file"
-    local make_status=${PIPESTATUS[0]}
+	local make_status=${PIPESTATUS[0]}
+	set -e
 
     if [ $make_status -eq 0 ]; then
         mv "$log_file" "dist/${config}-OK.log"
