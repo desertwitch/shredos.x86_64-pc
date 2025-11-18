@@ -5,6 +5,7 @@ set -e
 trap 'exit 1' SIGINT
 trap 'exit 1' SIGTERM
 
+rm -r dist
 mkdir -p dist
 
 x64_configs=(
