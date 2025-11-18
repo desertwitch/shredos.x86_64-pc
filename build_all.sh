@@ -1,24 +1,32 @@
 #!/bin/bash
 
+################################################################################
+# 0 = "make clean" between same architecture configs (much slower)
+# 1 = "make grub2-rebuild" between same architecture configs (much faster)
+QUICK=0
+################################################################################
+
 set -e
+set -x
 
 trap 'exit 1' SIGINT
 trap 'exit 1' SIGTERM
 
+make clean
 rm -r dist
 mkdir -p dist
 
 x64_configs=(
-    "shredos_defconfig"
-    "shredos_img_defconfig"
-    "shredos_iso_defconfig"
+	"shredos_defconfig"
+	"shredos_img_defconfig"
+	"shredos_iso_defconfig"
 	"shredos_iso_aio_defconfig"
 )
 
 x32_configs=(
-    "shredos_i586_defconfig"
-    "shredos_img_i586_defconfig"
-    "shredos_iso_i586_defconfig"
+	"shredos_i586_defconfig"
+	"shredos_img_i586_defconfig"
+	"shredos_iso_i586_defconfig"
 	"shredos_iso_aio_i586_defconfig"
 )
 
@@ -30,75 +38,82 @@ x32_success=0
 x32_failed=0
 
 replace_version() {
-    local from=$1
-    local to=$2
-    if [ -f "$VERSION_FILE" ]; then
-        sed -i "s/$from/$to/g" "$VERSION_FILE"
-    fi
+	local from=$1
+	local to=$2
+	if [ -f "$VERSION_FILE" ]; then
+		sed -i "s/$from/$to/g" "$VERSION_FILE"
+	fi
 }
 
 build_config() {
-    local config=$1
-    local arch=$2
-    local log_file="dist/${config}.log"
+	local config=$1
+	local arch=$2
+	local log_file="dist/${config}.log"
 
-    echo "============================================"
-    echo "Building $config"
-    echo "============================================"
+	echo "============================================"
+	echo "Building $config"
+	echo "============================================"
 
-    make clean
-    make "$config"
+	if [ $QUICK -eq 1 ]; then
+		make "$config"
+		make grub2-rebuild
+	else
+		make clean
+		make "$config"
+	fi
 
 	set +e
-    make 2>&1 | tee "$log_file"
+	make 2>&1 | tee "$log_file"
 	local make_status=${PIPESTATUS[0]}
 	set -e
 
-    if [ $make_status -eq 0 ]; then
-        mv "$log_file" "dist/${config}-OK.log"
+	if [ "$make_status" -eq 0 ]; then
+		mv "$log_file" "dist/${config}-OK.log"
 
-        mkdir -p "dist/$config"
-        mv output/images/shredos*.iso "dist/$config/" 2>/dev/null || true
-        mv output/images/shredos*.img "dist/$config/" 2>/dev/null || true
+		mkdir -p "dist/$config"
+		mv output/images/shredos*.iso "dist/$config/" 2>/dev/null || true
+		mv output/images/shredos*.img "dist/$config/" 2>/dev/null || true
 
-        echo "--> $config build success"
+		echo "--> $config build success"
 
-        if [ "$arch" = "x64" ]; then
-            ((x64_success++))
-        else
-            ((x32_success++))
-        fi
-        return 0
-    else
-        mv "$log_file" "dist/${config}-FAILED.log"
+		if [ "$arch" = "x64" ]; then
+			((x64_success++))
+		else
+			((x32_success++))
+		fi
+		return 0
+	else
+		mv "$log_file" "dist/${config}-FAILED.log"
 
-        echo "--> $config build failed"
+		echo "--> $config build failed"
 
-        if [ "$arch" = "x64" ]; then
-            ((x64_failed++))
-        else
-            ((x32_failed++))
-        fi
-        return 1
-    fi
+		if [ "$arch" = "x64" ]; then
+			((x64_failed++))
+		else
+			((x32_failed++))
+		fi
+		return 1
+	fi
 }
 
 if [ ${#x64_configs[@]} -gt 0 ]; then
-    echo "Starting x64 builds..."
-    replace_version "i586" "x86-64"
+	echo "Starting x64 builds..."
+	replace_version "i586" "x86-64"
 
-    for config in "${x64_configs[@]}"; do
-        build_config "$config" "x64"
-    done
+	for config in "${x64_configs[@]}"; do
+		build_config "$config" "x64" || true
+	done
 fi
 
-if [ ${#x32_configs[@]} -gt 0 ]; then
-    echo "Starting x32 builds..."
-    replace_version "x86-64" "i586"
+make clean
 
-    for config in "${x32_configs[@]}"; do
-        build_config "$config" "x32"
-    done
+if [ ${#x32_configs[@]} -gt 0 ]; then
+	echo "Starting x32 builds..."
+	replace_version "x86-64" "i586"
+
+	for config in "${x32_configs[@]}"; do
+		build_config "$config" "x32" || true
+	done
 fi
 
 total_success=$((x64_success + x32_success))
@@ -116,7 +131,7 @@ echo "Total:       $total_success succeeded, $total_failed failed (out of $total
 echo "============================================"
 
 if [ $total_failed -gt 0 ]; then
-    exit 1
+	exit 1
 else
-    exit 0
+	exit 0
 fi
