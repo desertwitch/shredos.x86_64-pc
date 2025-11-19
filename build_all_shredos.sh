@@ -1,75 +1,125 @@
 #!/bin/bash
+set -euo pipefail
 
 ################################################################################
-# Usage:
-# NO_CLEAN=0|1 QUICK_BUILD=0|1 FAST_FAIL=0|1 NEW_VERSION="STRING" ./build_all.sh
+# Usage: ./build_all_shredos.sh [x64|x32|all]
 #
-# Examples:
-#  ./build_all.sh
-#  FAST_FAIL=0 QUICK_BUILD=0 ./build_all.sh
-#  NEW_VERSION="2024.11_27_x86-64_0.38" ./build_all.sh
+# Arguments:
+#  x64   - Build only x86-64 configurations
+#  x32   - Build only i586 (32-bit) configurations
+#  all   - Build all configurations (64-bit first, then 32-bit)
 #
 # Environment Variables:
-#  NO_CLEAN: 0='make clean' on start, 1=no 'make clean' on start (default: 0)
-#  QUICK_BUILD: 0=full clean between configs, 1=grub2-rebuild only (default: 0)
-#  FAST_FAIL: 0=continue on failure, 1=exit on first failure (default: 1)
-#  NEW_VERSION: Version string (default: prompts user & keeps current on ENTER)
+#  PRE_CLEAN=0|1    - Do an initial 'make clean' before starting (default: 1)
+#  QUICK_BUILD=0|1  - Do not full rebuild for same architecture (default: 0)
+#  FAST_FAIL=0|1    - Exit on first configuration build failure (default: 1)
+#  NEW_VERSION=STR  - Set version string (default: prompts user)
+#
+# Examples:
+#  ./build_all_shredos.sh x64
+#  ./build_all_shredos.sh all
+#  QUICK_BUILD=1 ./build_all_shredos.sh x32
+#  NEW_VERSION="2024.11_27_x86-64_0.38" ./build_all_shredos.sh x64
 ################################################################################
 
-################################################################################
-# 0 = "make clean" on start of the overall build process
-# 1 = no "make clean" on start of the overall build process
-NO_CLEAN="${NO_CLEAN:-0}"
-################################################################################
-
-################################################################################
-# 0 = "make clean" between same architecture configs (much slower)
-# 1 = "make grub2-rebuild" between same architecture configs (much faster)
-QUICK_BUILD="${QUICK_BUILD:-0}"
-################################################################################
-
-################################################################################
-# 0 = continue to the next configuration if one fails to build
-# 1 = exit the entire script if one configuration fails to build
-FAST_FAIL="${FAST_FAIL:-1}"
-################################################################################
-
-################################################################################
+# Location of the version file:
 VERSION_FILE="board/shredos/fsoverlay/etc/shredos/version.txt"
 
-x64_configs=(
+# 64-bit configurations to build:
+X64_CONFIGS=(
 	"shredos_defconfig"
 	"shredos_img_defconfig"
 	"shredos_iso_defconfig"
 	"shredos_iso_aio_defconfig"
 )
 
-x32_configs=(
+# 32-bit configurations to build:
+X32_CONFIGS=(
 	"shredos_i586_defconfig"
 	"shredos_img_i586_defconfig"
 	"shredos_iso_i586_defconfig"
 	"shredos_iso_aio_i586_defconfig"
 )
+
+# Packages always needing rebuild between runs, even for the same architecture.
+# This only applies when QUICK_BUILD is enabled, otherwise rebuilds everything.
+ALWAYS_REBUILD_PKGS=(
+	"grub2"
+)
+
 ################################################################################
 
-set -e
-trap 'exit 1' SIGINT
-trap 'exit 1' SIGTERM
+PRE_CLEAN="${PRE_CLEAN:-1}"
+QUICK_BUILD="${QUICK_BUILD:-0}"
+FAST_FAIL="${FAST_FAIL:-1}"
+NEW_VERSION="${NEW_VERSION:-}"
 
-x64_success=0
-x64_failed=0
-x32_success=0
-x32_failed=0
+X64_SUCCESS=0
+X64_FAILED=0
+X32_SUCCESS=0
+X32_FAILED=0
 
 GREEN="\033[0;32m"
 RED="\033[0;31m"
 RESET="\033[0m"
 
+print_usage() {
+	echo
+	echo "Usage: $0 [x64|x32|all]"
+	echo ""
+	echo "Arguments:"
+	echo "  x64   - Build only x86-64 configurations"
+	echo "  x32   - Build only i586 (32-bit) configurations"
+	echo "  all  - Build all configurations (64-bit first, then 32-bit)"
+	echo ""
+	echo "Environment Variables:"
+	echo "  PRE_CLEAN=0|1    - Do an initial 'make clean' before starting (default: 1)"
+	echo "  QUICK_BUILD=0|1  - Do not full rebuild for same architecture (default: 0)"
+	echo "  FAST_FAIL=0|1    - Exit on first failure (default: 1)"
+	echo "  NEW_VERSION=STR  - Set version string (default: prompts user)"
+	echo ""
+	echo "Examples:"
+	echo "  $0 x64"
+	echo "  $0 all"
+	echo "  QUICK_BUILD=1 PRE_CLEAN=0 $0 x32"
+	echo
+}
+
+parse_arguments() {
+	if [ $# -eq 0 ]; then
+		printf "%b" "$RED"
+		echo "Error: Missing architecture argument"
+		printf "%b" "$RESET"
+		print_usage
+		exit 1
+	fi
+
+	BUILD_TARGET="$1"
+	case "$BUILD_TARGET" in
+		x64)
+			X32_CONFIGS=()
+			;;
+		x32)
+			X64_CONFIGS=()
+			;;
+		all)
+			;;
+		*)
+			printf "%b" "$RED"
+			echo "Error: Invalid architecture '$BUILD_TARGET'"
+			echo "Must be one of: x64, x32, all"
+			printf "%b" "$RESET"
+			print_usage
+			exit 1
+			;;
+	esac
+}
+
 prompt_version() {
-	local CURRENT_VERSION=""
+	local current_version=""
 
 	if [ -f "$VERSION_FILE" ]; then
-		CURRENT_VERSION=$(cat "$VERSION_FILE")
+		current_version=$(cat "$VERSION_FILE")
 	else
 		printf "%b" "$RED"
 		echo
@@ -84,8 +134,8 @@ prompt_version() {
 	if [ -z "$NEW_VERSION" ]; then
 		echo
 		echo "x86-64 and i586 will be replaced/switched around during builds (depending on architecture)"
-		read -rp "Enter new version or press ENTER to keep existing [${CURRENT_VERSION}]: " NEW_VERSION
-		[ -z "$NEW_VERSION" ] && NEW_VERSION="$CURRENT_VERSION"
+		read -rp "Enter new version or press ENTER to keep existing [${current_version}]: " NEW_VERSION
+		[ -z "$NEW_VERSION" ] && NEW_VERSION="$current_version"
 	fi
 
 	echo "$NEW_VERSION" > "$VERSION_FILE"
@@ -100,34 +150,43 @@ prompt_version() {
 }
 
 display_build_plan() {
-	local total_configs=$((${#x64_configs[@]} + ${#x32_configs[@]}))
+	local total_configs=$((${#X64_CONFIGS[@]} + ${#X32_CONFIGS[@]}))
 
 	printf "%b" "$GREEN"
 	echo
 	echo "==============================================="
 	echo "PLANNING TO BUILD:"
 	echo "==============================================="
-	echo "Version:        $NEW_VERSION"
-	echo "Fail Fast:      $FAST_FAIL"
-	echo "Quick Build:    $QUICK_BUILD"
-	echo "No Pre-Clean:   $NO_CLEAN"
-	echo "Total Configs:  $total_configs"
+	echo "Version:                  $NEW_VERSION"
+	echo "Pre-Clean:                $PRE_CLEAN"
+	echo "Quick Build:              $QUICK_BUILD"
+	echo "Fast Failure:             $FAST_FAIL"
+	echo "Total Configurations:     $total_configs"
+	echo "Building Architectures:   $BUILD_TARGET"
 	echo "==============================================="
 	echo
 	printf "%b" "$RESET"
 
-	if [ ${#x64_configs[@]} -gt 0 ]; then
-		echo "64-bit targets (${#x64_configs[@]}):"
-		for config in "${x64_configs[@]}"; do
+	if [ ${#X64_CONFIGS[@]} -gt 0 ]; then
+		echo "64-bit configurations (${#X64_CONFIGS[@]}):"
+		for config in "${X64_CONFIGS[@]}"; do
 			echo "  - $config"
 		done
 		echo
 	fi
 
-	if [ ${#x32_configs[@]} -gt 0 ]; then
-		echo "32-bit targets (${#x32_configs[@]}):"
-		for config in "${x32_configs[@]}"; do
+	if [ ${#X32_CONFIGS[@]} -gt 0 ]; then
+		echo "32-bit configurations (${#X32_CONFIGS[@]}):"
+		for config in "${X32_CONFIGS[@]}"; do
 			echo "  - $config"
+		done
+		echo
+	fi
+
+	if [ "$QUICK_BUILD" -eq 1 ] && [ ${#ALWAYS_REBUILD_PKGS[@]} -gt 0 ]; then
+		echo "Packages that will be re-built between same-architecture runs (${#ALWAYS_REBUILD_PKGS[@]}):"
+		for package in "${ALWAYS_REBUILD_PKGS[@]}"; do
+			echo "  - $package"
 		done
 		echo
 	fi
@@ -143,14 +202,16 @@ display_build_plan() {
 replace_version() {
 	local from=$1
 	local to=$2
+
 	if [ -f "$VERSION_FILE" ]; then
-		sed -i "s/$from/$to/g" "$VERSION_FILE"
+		sed -i "s@$from@$to@g" "$VERSION_FILE"
 	fi
 }
 
 build_config() {
-	local config=$1
-	local arch=$2
+	local index="$1"
+	local config="$2"
+	local arch="$3"
 	local log_file="dist/${config}.log"
 
 	echo
@@ -160,20 +221,35 @@ build_config() {
 	echo
 
 	if [ "$QUICK_BUILD" -eq 1 ]; then
-		make "$config"
-		make grub2-rebuild
+		if ! make "$config"; then
+			build_config_failed "$config" "$arch" "$log_file"
+			return 1
+		fi
+		if [ "$index" -ne 0 ]; then
+			for pkg in "${ALWAYS_REBUILD_PKGS[@]}"; do
+				if ! make "${pkg}-rebuild"; then
+					build_config_failed "$config" "$arch" "$log_file"
+					return 1
+				fi
+			done
+		fi
 	else
-		make clean
-		make "$config"
+		if [ "$index" -ne 0 ]; then
+			if ! make clean; then
+				build_config_failed "$config" "$arch" "$log_file"
+				return 1
+			fi
+		fi
+		if ! make "$config"; then
+			build_config_failed "$config" "$arch" "$log_file"
+			return 1
+		fi
 	fi
 
-	[ ! "$FAST_FAIL" -eq 1 ] && set +e
-	make 2>&1 | tee "$log_file"
-	local make_status=${PIPESTATUS[0]}
-	[ ! "$FAST_FAIL" -eq 1 ] && set -e
-
-	if [ "$make_status" -eq 0 ]; then
-		mv "$log_file" "dist/${config}-SUCCESS.log"
+	if make 2>&1 | tee "$log_file"; then
+		if [ -f "$log_file" ]; then
+			mv "$log_file" "dist/${config}-SUCCESS.log"
+		fi
 
 		mkdir -p "dist/$config"
 		mv output/images/shredos*.iso "dist/$config/" 2>/dev/null || true
@@ -188,37 +264,79 @@ build_config() {
 		printf "%b" "$RESET"
 
 		if [ "$arch" = "x64" ]; then
-			((x64_success++))
+			((X64_SUCCESS++))
 		else
-			((x32_success++))
+			((X32_SUCCESS++))
 		fi
+
 		return 0
 	else
-		mv "$log_file" "dist/${config}-FAILED.log"
+		build_config_failed "$config" "$arch" "$log_file"
+		return 1
+	fi
+}
 
+print_summary() {
+	local total_success=$((X64_SUCCESS + X32_SUCCESS))
+	local total_failed=$((X64_FAILED + X32_FAILED))
+	local total_builds=$((total_success + total_failed))
+
+	echo
+	echo "============================================"
+	echo "BUILD SUMMARY"
+	echo "============================================"
+	echo "64-bit builds:  $X64_SUCCESS succeeded, $X64_FAILED failed"
+	echo "32-bit builds:  $X32_SUCCESS succeeded, $X32_FAILED failed"
+	echo "--------------------------------------------"
+	echo "Total:  $total_success succeeded, $total_failed failed (out of $total_builds)"
+	echo "--------------------------------------------"
+	echo "You will find all output files of the builds in the 'dist/' folder."
+	echo "============================================"
+	echo
+}
+
+build_config_failed() {
+	local config="$1"
+	local arch="$2"
+	local log_file="$3"
+
+	if [ -f "$log_file" ]; then
+		mv "$log_file" "dist/${config}-FAILED.log"
+	fi
+
+	printf "%b" "$RED"
+	echo
+	echo "==============================================="
+	echo "$config build ($arch) failed"
+	echo "==============================================="
+	echo
+	printf "%b" "$RESET"
+
+	if [ "$arch" = "x64" ]; then
+		((X64_FAILED++))
+	else
+		((X32_FAILED++))
+	fi
+
+	if [ "$FAST_FAIL" -eq 1 ]; then
 		printf "%b" "$RED"
 		echo
 		echo "==============================================="
-		echo "$config build ($arch) failed"
+		echo "Fast Failure Mode is enabled - not proceeding..."
 		echo "==============================================="
 		echo
 		printf "%b" "$RESET"
-
-		if [ "$arch" = "x64" ]; then
-			((x64_failed++))
-		else
-			((x32_failed++))
-		fi
-		return 1
+		exit 1
 	fi
 }
 
 ################################################################################
 
+parse_arguments "$@"
 prompt_version
 display_build_plan
 
-if [ "$NO_CLEAN" -eq 0 ]; then
+if [ "$PRE_CLEAN" -eq 1 ]; then
 	printf "%b" "$RED"
 	echo
 	echo "==============================================="
@@ -230,7 +348,7 @@ if [ "$NO_CLEAN" -eq 0 ]; then
 	printf "%b" "$RESET"
 	
 	if read -rt 10; then
-		NO_CLEAN=1
+		PRE_CLEAN=0
 		echo "Skipped cleaning the building stage (no 'make clean')..."
 	fi
 fi
@@ -239,7 +357,7 @@ printf "%b" "$GREEN"
 echo
 echo "==============================================="
 echo "Starting build in 10 seconds... (press CTRL+C to cancel)"
-if [ ! "$NO_CLEAN" -eq 1 ]; then
+if [ "$PRE_CLEAN" -eq 1 ]; then
 	printf "%b" "$RESET"
 	printf "%b" "$RED"
 	echo "Beware - WILL run a MAKE CLEAN before starting building!"
@@ -252,7 +370,7 @@ printf "%b" "$RESET"
 
 sleep 10
 
-if [ ! "$NO_CLEAN" -eq 1 ]; then
+if [ "$PRE_CLEAN" -eq 1 ]; then
 	echo "Running 'make clean' on the building environment..."
 	make clean
 fi
@@ -262,8 +380,9 @@ rm -r dist || true
 mkdir -p dist
 
 echo "Starting to build..."
+trap 'print_summary' EXIT
 
-if [ ${#x64_configs[@]} -gt 0 ]; then
+if [ ${#X64_CONFIGS[@]} -gt 0 ]; then
 	echo
 	echo "==============================================="
 	echo "Starting 64-bit builds..."
@@ -271,14 +390,18 @@ if [ ${#x64_configs[@]} -gt 0 ]; then
 	echo
 	replace_version "i586" "x86-64"
 
-	for config in "${x64_configs[@]}"; do
-		build_config "$config" "x64" || true
+	CFG_INDEX=0
+	for config in "${X64_CONFIGS[@]}"; do
+		build_config "$CFG_INDEX" "$config" "x64" || true
+		((++CFG_INDEX))
 	done
 fi
 
-make clean
+if [ ${#X32_CONFIGS[@]} -gt 0 ]; then
+	if [ ${#X64_CONFIGS[@]} -gt 0 ]; then
+		make clean
+	fi
 
-if [ ${#x32_configs[@]} -gt 0 ]; then
 	echo
 	echo "==============================================="
 	echo "Starting 32-bit builds..."
@@ -286,29 +409,15 @@ if [ ${#x32_configs[@]} -gt 0 ]; then
 	echo
 	replace_version "x86-64" "i586"
 
-	for config in "${x32_configs[@]}"; do
-		build_config "$config" "x32" || true
+	CFG_INDEX=0
+	for config in "${X32_CONFIGS[@]}"; do
+		build_config "$CFG_INDEX" "$config" "x32" || true
+		((++CFG_INDEX))
 	done
 fi
 
-total_success=$((x64_success + x32_success))
-total_failed=$((x64_failed + x32_failed))
-total_builds=$((total_success + total_failed))
-
-echo
-echo "============================================"
-echo "BUILD SUMMARY"
-echo "============================================"
-echo "64-bit builds:  $x64_success succeeded, $x64_failed failed"
-echo "32-bit builds:  $x32_success succeeded, $x32_failed failed"
-echo "--------------------------------------------"
-echo "Total:  $total_success succeeded, $total_failed failed (out of $total_builds)"
-echo "--------------------------------------------"
-echo "You will find all output files of the builds in the 'dist/' folder."
-echo "============================================"
-echo
-
-if [ $total_failed -gt 0 ]; then
+TOTAL_FAILED=$((X64_FAILED + X32_FAILED))
+if [ "$TOTAL_FAILED" -gt 0 ]; then
 	exit 1
 else
 	exit 0
