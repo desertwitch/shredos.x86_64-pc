@@ -2,29 +2,36 @@
 
 ################################################################################
 # Usage:
-#  FAIL_ON_ERROR=0|1 QUICK_BUILD=0|1 NEW_VERSION="STRING" ./build_all.sh
+# NO_CLEAN=0|1 QUICK_BUILD=0|1 FAST_FAIL=0|1 NEW_VERSION="STRING" ./build_all.sh
 #
 # Examples:
 #  ./build_all.sh
-#  FAIL_ON_ERROR=0 QUICK_BUILD=0 ./build_all.sh
+#  FAST_FAIL=0 QUICK_BUILD=0 ./build_all.sh
 #  NEW_VERSION="2024.11_27_x86-64_0.38" ./build_all.sh
 #
 # Environment Variables:
-#  FAIL_ON_ERROR - 0=continue on failure, 1=exit on first failure (default: 1)
-#  QUICK_BUILD - 0=full clean between configs, 1=grub2-rebuild only (default: 1)
-#  NEW_VERSION - Version string (default: prompts user & keeps current on ENTER)
+#  NO_CLEAN: 0='make clean' on start, 1=no 'make clean' on start (default: 0)
+#  QUICK_BUILD: 0=full clean between configs, 1=grub2-rebuild only (default: 0)
+#  FAST_FAIL: 0=continue on failure, 1=exit on first failure (default: 1)
+#  NEW_VERSION: Version string (default: prompts user & keeps current on ENTER)
 ################################################################################
 
 ################################################################################
-# 0 = continue to the next configuration if one fails to build
-# 1 = exit the entire script if one configuration fails to build
-FAIL_ON_ERROR="${FAIL_ON_ERROR:-1}"
+# 0 = "make clean" on start of the overall build process
+# 1 = no "make clean" on start of the overall build process
+NO_CLEAN="${NO_CLEAN:-0}"
 ################################################################################
 
 ################################################################################
 # 0 = "make clean" between same architecture configs (much slower)
 # 1 = "make grub2-rebuild" between same architecture configs (much faster)
-QUICK_BUILD="${QUICK_BUILD:-1}"
+QUICK_BUILD="${QUICK_BUILD:-0}"
+################################################################################
+
+################################################################################
+# 0 = continue to the next configuration if one fails to build
+# 1 = exit the entire script if one configuration fails to build
+FAST_FAIL="${FAST_FAIL:-1}"
 ################################################################################
 
 ################################################################################
@@ -101,8 +108,9 @@ display_build_plan() {
 	echo "PLANNING TO BUILD:"
 	echo "==============================================="
 	echo "Version:        $NEW_VERSION"
-	echo "Fail on Error:  $FAIL_ON_ERROR"
+	echo "Fail Fast:      $FAST_FAIL"
 	echo "Quick Build:    $QUICK_BUILD"
+	echo "No Pre-Clean:   $NO_CLEAN"
 	echo "Total Configs:  $total_configs"
 	echo "==============================================="
 	echo
@@ -159,10 +167,10 @@ build_config() {
 		make "$config"
 	fi
 
-	[ ! "$FAIL_ON_ERROR" -eq 1 ] && set +e
+	[ ! "$FAST_FAIL" -eq 1 ] && set +e
 	make 2>&1 | tee "$log_file"
 	local make_status=${PIPESTATUS[0]}
-	[ ! "$FAIL_ON_ERROR" -eq 1 ] && set -e
+	[ ! "$FAST_FAIL" -eq 1 ] && set -e
 
 	if [ "$make_status" -eq 0 ]; then
 		mv "$log_file" "dist/${config}-SUCCESS.log"
@@ -177,7 +185,7 @@ build_config() {
 		echo "$config build ($arch) success"
 		echo "==============================================="
 		echo
-		printf "%b\n" "$RESET"
+		printf "%b" "$RESET"
 
 		if [ "$arch" = "x64" ]; then
 			((x64_success++))
@@ -194,7 +202,7 @@ build_config() {
 		echo "$config build ($arch) failed"
 		echo "==============================================="
 		echo
-		printf "%b\n" "$RESET"
+		printf "%b" "$RESET"
 
 		if [ "$arch" = "x64" ]; then
 			((x64_failed++))
@@ -210,19 +218,44 @@ build_config() {
 prompt_version
 display_build_plan
 
-printf "%b" "$RED"
+if [ "$NO_CLEAN" -eq 0 ]; then
+	printf "%b" "$RED"
+	echo
+	echo "==============================================="
+	echo "Beware - WILL run a MAKE CLEAN before starting building!"
+	echo "Press ENTER in the next 10 seconds to skip this step..."
+	echo "or otherwise (if you want to MAKE CLEAN) - just wait..."
+	echo "==============================================="
+	echo
+	printf "%b" "$RESET"
+	
+	if read -rt 10; then
+		NO_CLEAN=1
+		echo "Skipped cleaning the building stage (no 'make clean')..."
+	fi
+fi
+
+printf "%b" "$GREEN"
 echo
 echo "==============================================="
-echo "Starting builds in 15 seconds... (press CTRL+C to cancel)"
-echo "Beware - WILL run a MAKE CLEAN before starting building!"
+echo "Starting build in 10 seconds... (press CTRL+C to cancel)"
+if [ ! "$NO_CLEAN" -eq 1 ]; then
+	printf "%b" "$RESET"
+	printf "%b" "$RED"
+	echo "Beware - WILL run a MAKE CLEAN before starting building!"
+	printf "%b" "$RESET"
+	printf "%b" "$GREEN"
+fi
 echo "==============================================="
 echo
-printf "%b\n" "$RESET"
+printf "%b" "$RESET"
 
-sleep 15
+sleep 10
 
-echo "Running 'make clean' on the building environment..."
-make clean
+if [ ! "$NO_CLEAN" -eq 1 ]; then
+	echo "Running 'make clean' on the building environment..."
+	make clean
+fi
 
 echo "Removing and recreating 'dist/' folder (if it exists)..."
 rm -r dist || true
