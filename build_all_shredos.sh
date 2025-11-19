@@ -94,7 +94,7 @@ prompt_version() {
 
 display_build_plan() {
 	local total_configs=$((${#x64_configs[@]} + ${#x32_configs[@]}))
-	
+
 	printf "%b" "$GREEN"
 	echo
 	echo "==============================================="
@@ -107,7 +107,7 @@ display_build_plan() {
 	echo "==============================================="
 	echo
 	printf "%b" "$RESET"
-	
+
 	if [ ${#x64_configs[@]} -gt 0 ]; then
 		echo "64-bit targets (${#x64_configs[@]}):"
 		for config in "${x64_configs[@]}"; do
@@ -115,7 +115,7 @@ display_build_plan() {
 		done
 		echo
 	fi
-	
+
 	if [ ${#x32_configs[@]} -gt 0 ]; then
 		echo "32-bit targets (${#x32_configs[@]}):"
 		for config in "${x32_configs[@]}"; do
@@ -123,7 +123,7 @@ display_build_plan() {
 		done
 		echo
 	fi
-	
+
 	printf "%b" "$GREEN"
 	echo "==============================================="
 	echo "Configurations to build can be amended inside the script."
@@ -210,8 +210,16 @@ build_config() {
 prompt_version
 display_build_plan
 
-echo "Starting these builds in 10 seconds... (press CTRL+C to cancel)"
-sleep 10
+printf "%b" "$RED"
+echo
+echo "==============================================="
+echo "Starting builds in 15 seconds... (press CTRL+C to cancel)"
+echo "Beware - WILL run a MAKE CLEAN before starting building!"
+echo "==============================================="
+echo
+printf "%b\n" "$RESET"
+
+sleep 15
 
 echo "Running 'make clean' on the building environment..."
 make clean
