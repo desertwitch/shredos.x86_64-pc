@@ -216,11 +216,15 @@ replace_version() {
 }
 
 run_cmd() {
-    if [ "$DRY_RUN" -eq 1 ]; then
-        echo "[DRY_RUN] $*"
-    else
-        "$@"
-    fi
+	local timestamp
+	timestamp=$(date '+%d.%m.%Y %H:%M:%S')
+
+	if [ "$DRY_RUN" -eq 1 ]; then
+		echo "[DRY_RUN] $*"
+	else
+		echo "[$timestamp] $*" >> "build_all_shredos.log"
+		"$@"
+	fi
 }
 
 build_config() {
@@ -229,7 +233,7 @@ build_config() {
 	local arch="$3"
 	local log_file="dist/${config}.log"
 
-    printf "%b" "$YELLOW"
+	printf "%b" "$YELLOW"
 	echo
 	echo "============================================"
 	echo "Started: '$config' ($arch)"
@@ -417,6 +421,10 @@ build_config_failed() {
 }
 
 ################################################################################
+
+if [ -f "build_all_shredos.log" ]; then
+	rm build_all_shredos.log
+fi
 
 parse_arguments "$@"
 prompt_version
