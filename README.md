@@ -844,11 +844,15 @@ Do note that loading a configuration should typically be the last step before `m
 
 #### Building multiple configurations:
 
-Generally when building multiple of the above configurations on the **same
-architecture**, you only need to ensure `make grub2-rebuild` is run between any
-two configurations, unless you have made other changes to the project. For two
-configurations of **different architectures**, a full `make clean` is always
-required for the switch-over between two different architectures.
+Generally, when building multiple configurations of the above on the same
+architecture, you only need to ensure that `make` and `make grub2-reconfigure`
+are run between any two configurations. The same applies to any other package
+whose configuration has changed, adding corresponding `<package>-reconfigure`
+steps. A `make clean` step is not usually required unless you have made
+significant changes to the project, which should save time with such builds.
+
+For two configurations targeting different architectures, a full `make clean`
+is always required when switching between them, plan time for this (takes long).
 
 For your convenience, look also into the `build_all_shredos.sh` script in the
 project root. If you invoke it with no arguments, it will show a usage manual
@@ -907,15 +911,15 @@ The GRUB configuration that is embedded into the GRUB images at build-time.
 It contains directions for GRUB to find the right volume and GRUB configuration.
 This applies for both the USB images and ISO images, and both for BIOS and UEFI.
 		
-#### ../fs/iso9660/isolinux.cfg
+#### ../board/shredos/iso/isolinux.cfg
 The ISO image's ISOLINUX configuration, which the BIOS bootloader will use.
 It contains the BIOS boot menu for the ISO image.
 		
-#### ../fs/iso9660/grub.cfg
+#### ../board/shredos/iso/grub.cfg
 The ISO image's GRUB configuration, which the UEFI bootloader will use.
 It contains the UEFI boot menu for the ISO image.
 		
-#### ../fs/iso9660/efigrub.cfg
+#### ../board/shredos/iso/efigrub.cfg
 The GRUB configuration that is embedded into the ISO's UEFI partition.
 It contains directions for GRUB to find the ISO9660 FS and GRUB configuration.
 		
