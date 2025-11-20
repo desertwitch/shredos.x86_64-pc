@@ -144,7 +144,7 @@ prompt_version() {
 		[ -z "$NEW_VERSION" ] && NEW_VERSION="$current_version"
 	fi
 
-	echo "$NEW_VERSION" > "$VERSION_FILE"
+	run_cmd echo "$NEW_VERSION" > "$VERSION_FILE"
 
 	printf "%b" "$GREEN"
 	echo
@@ -211,7 +211,7 @@ replace_version() {
 	local to=$2
 
 	if [ -f "$VERSION_FILE" ]; then
-		sed -i "s@$from@$to@g" "$VERSION_FILE"
+		run_cmd sed -i "s@$from@$to@g" "$VERSION_FILE"
 	fi
 }
 
