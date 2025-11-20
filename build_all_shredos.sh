@@ -10,6 +10,7 @@ set -euo pipefail
 #  all   - Build all configurations (64-bit first, then 32-bit)
 #
 # Environment Variables:
+#  DRY_RUN=0|1      - Output all commands that would be executed (default: 0)
 #  PRE_CLEAN=0|1    - Do an initial 'make clean' before starting (default: 1)
 #  QUICK_BUILD=0|1  - Do not full rebuild for same architecture (default: 0)
 #  FAST_FAIL=0|1    - Exit on first configuration build failure (default: 1)
@@ -49,6 +50,7 @@ ALWAYS_REBUILD_PKGS=(
 
 ################################################################################
 
+DRY_RUN="${DRY_RUN:-0}"
 PRE_CLEAN="${PRE_CLEAN:-1}"
 QUICK_BUILD="${QUICK_BUILD:-0}"
 FAST_FAIL="${FAST_FAIL:-1}"
@@ -60,8 +62,11 @@ X32_SUCCESS=0
 X32_FAILED=0
 
 GREEN="\033[0;32m"
+YELLOW="\033[0;33m"
 RED="\033[0;31m"
 RESET="\033[0m"
+
+FORCE_CLEAN=0
 
 print_usage() {
 	echo
@@ -73,6 +78,7 @@ print_usage() {
 	echo "  all  - Build all configurations (64-bit first, then 32-bit)"
 	echo ""
 	echo "Environment Variables:"
+	echo "  DRY_RUN=0|1      - Output all commands that would be executed (default: 0)"
 	echo "  PRE_CLEAN=0|1    - Do an initial 'make clean' before starting (default: 1)"
 	echo "  QUICK_BUILD=0|1  - Do not full rebuild for same architecture (default: 0)"
 	echo "  FAST_FAIL=0|1    - Exit on first failure (default: 1)"
@@ -158,6 +164,7 @@ display_build_plan() {
 	echo "PLANNING TO BUILD:"
 	echo "==============================================="
 	echo "Version:                  $NEW_VERSION"
+	echo "Dry-Run:                  $DRY_RUN"
 	echo "Pre-Clean:                $PRE_CLEAN"
 	echo "Quick Build:              $QUICK_BUILD"
 	echo "Fast Failure:             $FAST_FAIL"
@@ -183,7 +190,7 @@ display_build_plan() {
 		echo
 	fi
 
-	if [ "$QUICK_BUILD" -eq 1 ] && [ ${#ALWAYS_REBUILD_PKGS[@]} -gt 0 ]; then
+	if [ ${#ALWAYS_REBUILD_PKGS[@]} -gt 0 ]; then
 		echo "Packages that will be re-built between same-architecture runs (${#ALWAYS_REBUILD_PKGS[@]}):"
 		for package in "${ALWAYS_REBUILD_PKGS[@]}"; do
 			echo "  - $package"
@@ -208,69 +215,120 @@ replace_version() {
 	fi
 }
 
+run_cmd() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "[DRY_RUN] $*"
+    else
+        "$@"
+    fi
+}
+
 build_config() {
 	local index="$1"
 	local config="$2"
 	local arch="$3"
 	local log_file="dist/${config}.log"
 
+    printf "%b" "$YELLOW"
 	echo
 	echo "============================================"
-	echo "Building $config ($arch)"
+	echo "Started: '$config' ($arch)"
 	echo "============================================"
 	echo
+	printf "%b" "$RESET"
 
-	if [ "$QUICK_BUILD" -eq 1 ]; then
-		if ! make "$config"; then
+	# Build  | QuickBuild=1, PreClean=1  | QuickBuild=0, PreClean=1  | QuickBuild=1, PreClean=0  | QuickBuild=0, PreClean=0
+	# -------|---------------------------|---------------------------|---------------------------|---------------------------
+	# x64 #0 | config -> make            | config -> make            | config -> rebuild -> make | config -> rebuild -> make
+	# x64 #1 | config -> rebuild -> make | clean -> config -> make   | config -> rebuild -> make | clean -> config -> make
+	# x64 #2+| config -> rebuild -> make | clean -> config -> make   | config -> rebuild -> make | clean -> config -> make
+	# x32 #0 | clean -> config -> make   | clean -> config -> make   | clean -> config -> make   | clean -> config -> make
+	# x32 #1+| config -> rebuild -> make | clean -> config -> make   | config -> rebuild -> make | clean -> config -> make
+
+	if [ "$index" -ne 0 ] && [ "$QUICK_BUILD" -eq 1 ] && [ "$FORCE_CLEAN" -ne 1 ]; then
+		# If it's not the first configuration, and quick-build is enabled,
+		# and a clean is not otherwise forced, just rebuild necessary packages.
+		echo
+		echo "============================================"
+		echo "Loading configuration '$config' ($arch)..."
+		echo "============================================"
+		echo
+		if ! run_cmd make "$config"; then
 			build_config_failed "$config" "$arch" "$log_file"
 			return 1
 		fi
-		if [ "$index" -ne 0 ]; then
+		echo
+		echo "============================================"
+		echo "Rebuilding packages for '$config' ($arch)..."
+		echo "============================================"
+		echo
+		for pkg in "${ALWAYS_REBUILD_PKGS[@]}"; do
+			if ! run_cmd make "${pkg}-rebuild"; then
+				build_config_failed "$config" "$arch" "$log_file"
+				return 1
+			fi
+		done
+	else
+		if [ "$index" -ne 0 ] || [ "$FORCE_CLEAN" -eq 1 ]; then
+			# If it's not the first configuration, or the clean was forced
+			# (due to architecture change), clean the building environment.
+			echo
+			echo "============================================"
+			echo "Running 'make clean' for '$config' ($arch)..."
+			echo "============================================"
+			echo
+			if ! run_cmd make clean; then
+				build_config_failed "$config" "$arch" "$log_file"
+				return 1
+			fi
+		fi
+		echo
+		echo "============================================"
+		echo "Loading configuration '$config' ($arch)..."
+		echo "============================================"
+		echo
+		if ! run_cmd make "$config"; then
+			build_config_failed "$config" "$arch" "$log_file"
+			return 1
+		fi
+		if [ "$index" -eq 0 ] && [ "$PRE_CLEAN" -eq 0 ] && [ "$FORCE_CLEAN" -ne 1 ]; then
+			# If it's the first configuration in a deliberately unclean environment,
+			# and clean was not otherwise forced, at least rebuild the necessary packages.
+			echo
+			echo "============================================"
+			echo "Rebuilding packages for '$config' ($arch)..."
+			echo "============================================"
+			echo
 			for pkg in "${ALWAYS_REBUILD_PKGS[@]}"; do
-				if ! make "${pkg}-rebuild"; then
+				if ! run_cmd make "${pkg}-rebuild"; then
 					build_config_failed "$config" "$arch" "$log_file"
 					return 1
 				fi
 			done
 		fi
-	else
-		if [ "$index" -ne 0 ]; then
-			if ! make clean; then
-				build_config_failed "$config" "$arch" "$log_file"
-				return 1
-			fi
-		fi
-		if ! make "$config"; then
-			build_config_failed "$config" "$arch" "$log_file"
-			return 1
-		fi
 	fi
 
-	if make 2>&1 | tee "$log_file"; then
-		if [ -f "$log_file" ]; then
-			mv "$log_file" "dist/${config}-SUCCESS.log"
-		fi
+	FORCE_CLEAN=0 # Reset previous dirty state
 
-		mkdir -p "dist/$config"
-		mv output/images/shredos*.iso "dist/$config/" 2>/dev/null || true
-		mv output/images/shredos*.img "dist/$config/" 2>/dev/null || true
-
-		printf "%b" "$GREEN"
+	echo
+	echo "============================================"
+	echo "Building '$config' ($arch)..."
+	echo "============================================"
+	echo
+	if run_cmd make 2>&1 | tee "$log_file"; then
 		echo
-		echo "==============================================="
-		echo "$config build ($arch) success"
-		echo "==============================================="
+		echo "============================================"
+		echo "Finishing '$config' ($arch)..."
+		echo "============================================"
 		echo
-		printf "%b" "$RESET"
-
-		if [ "$arch" = "x64" ]; then
-			((X64_SUCCESS++))
-		else
-			((X32_SUCCESS++))
-		fi
-
+		build_config_success "$config" "$arch" "$log_file"
 		return 0
 	else
+		echo
+		echo "============================================"
+		echo "Finishing '$config' ($arch)..."
+		echo "============================================"
+		echo
 		build_config_failed "$config" "$arch" "$log_file"
 		return 1
 	fi
@@ -295,19 +353,47 @@ print_summary() {
 	echo
 }
 
+build_config_success() {
+	local config="$1"
+	local arch="$2"
+	local log_file="$3"
+
+	if [ -f "$log_file" ]; then
+		run_cmd mv "$log_file" "dist/${config}-SUCCESS.log"
+	fi
+
+	run_cmd mkdir -p "dist/$config"
+	run_cmd mv output/images/shredos*.iso "dist/$config/" 2>/dev/null || true
+	run_cmd mv output/images/shredos*.img "dist/$config/" 2>/dev/null || true
+
+	printf "%b" "$GREEN"
+	echo
+	echo "==============================================="
+	echo "SUCCESS: '$config' ($arch)"
+	echo "==============================================="
+	echo
+	printf "%b" "$RESET"
+
+	if [ "$arch" = "x64" ]; then
+		((X64_SUCCESS++))
+	else
+		((X32_SUCCESS++))
+	fi
+}
+
 build_config_failed() {
 	local config="$1"
 	local arch="$2"
 	local log_file="$3"
 
 	if [ -f "$log_file" ]; then
-		mv "$log_file" "dist/${config}-FAILED.log"
+		run_cmd mv "$log_file" "dist/${config}-FAILED.log"
 	fi
 
 	printf "%b" "$RED"
 	echo
 	echo "==============================================="
-	echo "$config build ($arch) failed"
+	echo "FAILURE: '$config' ($arch)"
 	echo "==============================================="
 	echo
 	printf "%b" "$RESET"
@@ -336,6 +422,17 @@ parse_arguments "$@"
 prompt_version
 display_build_plan
 
+if [ "$DRY_RUN" -eq 1 ]; then
+	printf "%b" "$YELLOW"
+	echo
+	echo "==============================================="
+	echo "DRY RUN - NO ACTUAL CHANGES WILL BE MADE"
+	echo "DISREGARD WARNINGS ABOUT 'MAKE CLEAN' ETC..."
+	echo "==============================================="
+	echo
+	printf "%b" "$RESET"
+fi
+
 if [ "$PRE_CLEAN" -eq 1 ]; then
 	printf "%b" "$RED"
 	echo
@@ -353,7 +450,7 @@ if [ "$PRE_CLEAN" -eq 1 ]; then
 	fi
 fi
 
-printf "%b" "$GREEN"
+printf "%b" "$YELLOW"
 echo
 echo "==============================================="
 echo "Starting build in 10 seconds... (press CTRL+C to cancel)"
@@ -362,7 +459,7 @@ if [ "$PRE_CLEAN" -eq 1 ]; then
 	printf "%b" "$RED"
 	echo "Beware - WILL run a MAKE CLEAN before starting building!"
 	printf "%b" "$RESET"
-	printf "%b" "$GREEN"
+	printf "%b" "$YELLOW"
 fi
 echo "==============================================="
 echo
@@ -372,12 +469,12 @@ sleep 10
 
 if [ "$PRE_CLEAN" -eq 1 ]; then
 	echo "Running 'make clean' on the building environment..."
-	make clean
+	run_cmd make clean
 fi
 
 echo "Removing and recreating 'dist/' folder (if it exists)..."
-rm -r dist || true
-mkdir -p dist
+run_cmd rm -r dist || true
+run_cmd mkdir -p dist
 
 echo "Starting to build..."
 trap 'print_summary' EXIT
@@ -399,7 +496,8 @@ fi
 
 if [ ${#X32_CONFIGS[@]} -gt 0 ]; then
 	if [ ${#X64_CONFIGS[@]} -gt 0 ]; then
-		make clean
+		run_cmd make clean
+		FORCE_CLEAN=1 # Need this for architecture change
 	fi
 
 	echo
